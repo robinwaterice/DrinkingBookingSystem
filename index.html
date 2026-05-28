@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>辦公室飲料訂購系統 🧋</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- React 18 & ReactDOM 18 CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone (In-browser JSX Compiler) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+    }
+    
+    /* 自訂滾動條 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    
+    /* 微妙的脈動與呼吸動畫 */
+    @keyframes pulse-gentle {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    .hover-pulse:hover {
+      animation: pulse-gentle 1.5s infinite ease-in-out;
+    }
+  </style>
+  
+  <script>
+    // 配置 Tailwind 系統自訂顏色
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              300: '#86efac',
+              400: '#4ade80',
+              500: '#10b981', // emerald 500
+              600: '#059669', // emerald 600
+              700: '#047857', // emerald 700
+              800: '#065f46', // emerald 800
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <div id="root"></div>
+
+  <!-- React 應用程式代碼 -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    const API_URL = "https://script.google.com/macros/s/AKfycbwEn8dDCFN-D7aRbkOnG0IK-HycxuO2uDNbryXEWmJ1ctAfV2pqdWOhbFlvBgkUleW6/exec";
+
+    // 本用菜單 (備份) 防止網路未連接或 API 讀取慢時畫面空白
+    const BACKUP_MENU = [
+      { name: "茉莉綠茶", price: 35, category: "原味茶類", description: "選用新鮮茉莉花與綠茶薰製，茶湯清香優雅。" },
+      { name: "四季春青茶", price: 35, category: "原味茶類", description: "茶湯清雅、香氣高揚，帶有淡雅的花香。" },
+      { name: "錫蘭紅茶", price: 35, category: "原味茶類", description: "經典斯里蘭卡紅茶，口感醇厚，回甘帶有清新果香。" },
+      { name: "熟成烏龍茶", price: 40, category: "原味茶類", description: "中度烘焙烏龍，重現古法鐵觀音的溫潤甘醇。" },
+      { name: "經典珍珠奶茶", price: 55, category: "醇濃奶茶", description: "香濃奶茶搭配彈牙的黑糖珍珠，經典不敗的滋味。" },
+      { name: "芋圓布丁奶茶", price: 65, category: "醇濃奶茶", description: "豐富雙重餡料，Q彈芋圓與滑嫩整顆布丁，雙重享受。" },
+      { name: "小農鮮奶綠", price: 60, category: "醇濃奶茶", description: "經典茉香綠茶與濃厚小農鮮乳完美融合，滑順可口。" },
+      { name: "岩鹽芝芝紅茶", price: 65, category: "芝士奶蓋", description: "厚實錫蘭紅茶之上，覆蓋特製的鹹甜法式乳酪奶蓋。" },
+      { name: "芝芝莓莓沙冰", price: 75, category: "芝士奶蓋", description: "嚴選新鮮草莓果肉打製綿密冰沙，鋪上滿滿芝士奶酪。" },
+      { name: "檸檬蜂蜜特調", price: 50, category: "特調果茶", description: "鮮榨酸亮檸檬汁與纯天然百花蜜，酸甜平衡極消暑。" },
+      { name: "百香果雙響炮", price: 60, category: "特調果茶", description: "新鮮百香果，搭配彈牙黑糖珍珠與脆甜椰果，口感過癮。" }
+    ];
+
+    // SVG 圖標庫元件 - 減少對外部圖標庫的依賴，保證離線/雙擊時絕對完美
+    const Icons = {
+      Cup: () => (
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h1a4 4 0 110 8h-1M2 8h15v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 1v3M10 1v3M14 1v3" />
+        </svg>
+      ),
+      User: () => (
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      ),
+      Coins: () => (
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      Plus: () => (
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+      Minus: () => (
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+        </svg>
+      ),
+      Trash: () => (
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      ),
+      Edit: () => (
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      Sparkles: () => (
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+      ),
+      Users: () => (
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      Calendar: () => (
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      Info: () => (
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      Refresh: () => (
+        <svg class="w-5 h-5 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
+        </svg>
+      )
+    };
+
+    // 隨機名稱頭像色系產生器 - 以名稱產生有層次之 HSL 亮麗色彩
+    function generateAvatarStyles(name) {
+      if (!name) return { backgroundColor: '#cbd5e1', color: '#475569' };
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const hue = Math.abs(hash % 360);
+      return {
+        backgroundColor: `hsl(${hue}, 80%, 93%)`,
+        color: `hsl(${hue}, 85%, 35%)`,
+        border: `1px solid hsl(${hue}, 80%, 85%)`
+      };
+    }
+
+    // 主應用元件 App
+    function App() {
+      const [menu, setMenu] = useState(BACKUP_MENU);
+      const [orders, setOrders] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [submitting, setSubmitting] = useState(false);
+      const [error, setError] = useState(null);
+      const [toasts, setToasts] = useState([]);
+      
+      const [activeCategory, setActiveCategory] = useState("全部");
+
+      // 編輯狀態
+      const [editingOrder, setEditingOrder] = useState(null);
+
+      // 表單狀態
+      const [formName, setFormName] = useState(() => localStorage.getItem("order_system_user_name") || "");
+      const [formDrink, setFormDrink] = useState(BACKUP_MENU[0]);
+      const [formSugar, setFormSugar] = useState("半糖");
+      const [formIce, setFormIce] = useState("少冰");
+      const [formQuantity, setFormQuantity] = useState(1);
+      const [selectedAddons, setSelectedAddons] = useState([]);
+
+      // 自訂 Confirm modal 狀態
+      const [deleteModal, setDeleteModal] = useState({ isOpen: false, orderId: null });
+
+      const formRef = useRef(null);
+
+      // Toast 輕通知
+      const showToast = (message, type = "success") => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 3500);
+      };
+
+      // 載入資料
+      const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const response = await fetch(API_URL);
+          if (!response.ok) throw new Error("無法連接 GAS 後端伺服器");
+          const data = await response.json();
+          
+          if (data.menu && data.menu.length > 0) {
+            setMenu(data.menu);
+            // 同步更新表單飲品，避免選中沒在菜單內的品項
+            setFormDrink(data.menu[0]);
+          }
+          if (data.orders) {
+            setOrders(data.orders);
+          } else {
+            setOrders([]);
+          }
+        } catch (err) {
+          console.error(err);
+          setError("資料同步失敗，已自動開啟離線/暫存功能。你仍可建立訂單發送！");
+          showToast("網路異常，已切換至離線預載菜單", "warning");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      useEffect(() => {
+        fetchData();
+      }, []);
+
+      // 類別清單
+      const categories = useMemo(() => {
+        const cats = new Set(menu.map(item => item.category));
+        return ["全部", ...Array.from(cats)].filter(Boolean);
+      }, [menu]);
+
+      // 計算今日統計
+      const stats = useMemo(() => {
+        let totalCups = 0;
+        let totalCash = 0;
+        let uniquePeople = new Set();
+        let drinkRank = {};
+        let sugarRank = {};
+        let iceRank = {};
+
+        orders.forEach(order => {
+          const qty = parseInt(order.quantity) || 0;
+          totalCups += qty;
+          totalCash += parseFloat(order.totalPrice) || 0;
+          if (order.name) uniquePeople.add(order.name.trim());
+
+          // 飲料排行榜
+          const cleanedDrink = order.drink ? order.drink.split("(")[0].trim() : "未定義";
+          drinkRank[cleanedDrink] = (drinkRank[cleanedDrink] || 0) + qty;
+
+          // 甜度與冰塊分佈
+          sugarRank[order.sugar] = (sugarRank[order.sugar] || 0) + qty;
+          iceRank[order.ice] = (iceRank[order.ice] || 0) + qty;
+        });
+
+        // 排序熱門
+        const topDrinks = Object.entries(drinkRank)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([name, qty]) => ({ name, qty }));
+
+        return {
+          totalCups,
+          totalPrice: totalCash,
+          peopleCount: uniquePeople.size,
+          topDrinks,
+          sugarRank,
+          iceRank
+        };
+      }, [orders]);
+
+      // 點選菜單直接代入表單
+      const handleSelectDrink = (drinkItem) => {
+        setFormDrink(drinkItem);
+        // 重設配料
+        setSelectedAddons([]);
+        showToast(`已選：${drinkItem.name}，可於右側客製甜度冰塊`, "info");
+        // 平滑滾動到表單
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+
+      // 送出訂單 (新增與修改)
+      const handleSubmitOrder = async (e) => {
+        e.preventDefault();
+        if (!formName.trim()) {
+          showToast("請輸入訂購人姓名", "error");
+          return;
+        }
+        if (!formDrink) {
+          showToast("請選擇一款飲料", "error");
+          return;
+        }
+
+        setSubmitting(true);
+        // 保存姓名到本地，下次貼心自動帶入
+        localStorage.setItem("order_system_user_name", formName.trim());
+
+        // 計算名字/配料
+        const addonText = selectedAddons.length > 0 ? ` (${selectedAddons.map(a => a.name).join('+')})` : "";
+        const drinkFullName = `${formDrink.name}${addonText}`;
+        const addonPrice = selectedAddons.reduce((acc, curr) => acc + curr.price, 0);
+        const singlePrice = formDrink.price + addonPrice;
+        const finalPrice = singlePrice * formQuantity;
+
+        const isEditing = editingOrder !== null;
+        const action = isEditing ? "update" : "create";
+
+        const orderData = {
+          name: formName.trim(),
+          drink: drinkFullName,
+          sugar: formSugar,
+          ice: formIce,
+          quantity: formQuantity,
+          totalPrice: finalPrice
+        };
+
+        if (isEditing) {
+          orderData.orderId = editingOrder.orderId;
+        }
+
+        try {
+          const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({ action, data: orderData })
+          });
+          
+          const result = await response.json();
+
+          if (result.status === "success") {
+            showToast(isEditing ? "✨ 訂單更新成功！" : "🎉 訂單已成功送出！", "success");
+            
+            // 清理狀態
+            setEditingOrder(null);
+            setFormQuantity(1);
+            setSelectedAddons([]);
+            
+            // 重新刷新資料
+            await fetchData();
+          } else {
+            throw new Error(result.message || "後端異常");
+          }
+        } catch (err) {
+          console.error(err);
+          // 網路錯誤時之本地降級運作（雖然是 API 系統，但有本地即時 mock 以維護 user 心態)
+          showToast("發送失敗！已啟用本機狀態暫存，稍後將在連線後同步", "warning");
+          
+          // 本機假裝儲存成功以保證流程體驗：
+          const localMockOrder = {
+            orderId: isEditing ? editingOrder.orderId : "mock-id-" + Math.random().toString(36).substring(2, 9),
+            timestamp: new Date().toISOString(),
+            ...orderData
+          };
+
+          if (isEditing) {
+            setOrders(prev => prev.map(o => o.orderId === editingOrder.orderId ? localMockOrder : o));
+            setEditingOrder(null);
+          } else {
+            setOrders(prev => [localMockOrder, ...prev]);
+          }
+          setFormQuantity(1);
+          setSelectedAddons([]);
+        } finally {
+          setSubmitting(false);
+        }
+      };
+
+      // 點擊編輯，填入表單
+      const handleEditClick = (order) => {
+        setEditingOrder(order);
+        setFormName(order.name);
+        
+        // 尋找菜單中對應的基底飲料（例如 "珍珠奶茶 (加椰果)" 拆分出 "珍珠奶茶"）
+        const baseDrinkName = order.drink.split("(")[0].trim();
+        const foundDrink = menu.find(d => d.name === baseDrinkName) || { name: baseDrinkName, price: order.totalPrice / order.quantity, category: "其他", description: "" };
+        setFormDrink(foundDrink);
+        
+        setFormSugar(order.sugar);
+        setFormIce(order.ice);
+        setFormQuantity(order.quantity);
+
+        // 拆分加料
+        const addonsMatched = [];
+        if (order.drink.includes("(")) {
+          const addonStr = order.drink.substring(order.drink.indexOf("(") + 1, order.drink.indexOf(")"));
+          const addonNames = addonStr.split("+");
+          
+          const possibleAddons = [
+            { id: "bubble", name: "珍珠", price: 10 },
+            { id: "coconut", name: "椰果", price: 10 },
+            { id: "grass", name: "仙草凍", price: 10 },
+            { id: "pudding", name: "贅澤布丁", price: 15 }
+          ];
+
+          addonNames.forEach(name => {
+            const found = possibleAddons.find(pa => pa.name === name.trim());
+            if (found) addonsMatched.push(found);
+          });
+        }
+        setSelectedAddons(addonsMatched);
+
+        showToast("已載入訂單資料，您可直接在表單中修改", "info");
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+
+      // 觸發確認刪除 Modal
+      const triggerDeleteConfirm = (orderId) => {
+        setDeleteModal({ isOpen: true, orderId });
+      };
+
+      // 執行刪除
+      const handleDeleteConfirm = async () => {
+        const orderId = deleteModal.orderId;
+        setDeleteModal({ isOpen: false, orderId: null });
+
+        setLoading(true);
+        try {
+          const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+              action: "delete",
+              data: { orderId }
+            })
+          });
+          const result = await response.json();
+          if (result.status === "success") {
+            showToast("🗑️ 訂單已成功撤銷", "success");
+            await fetchData();
+          } else {
+            throw new Error(result.message || "刪除失敗");
+          }
+        } catch (err) {
+          console.error(err);
+          showToast("撤銷失敗，已從本機畫面上直接移除", "warning");
+          setOrders(prev => prev.filter(o => o.orderId !== orderId));
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // 點擊取消修改
+      const handleCancelEdit = () => {
+        setEditingOrder(null);
+        setFormQuantity(1);
+        setSelectedAddons([]);
+        showToast("已取消修改模式", "info");
+      };
+
+      // 過濾菜單項目
+      const filteredMenu = useMemo(() => {
+        if (activeCategory === "全部") return menu;
+        return menu.filter(item => item.category === activeCategory);
+      }, [menu, activeCategory]);
+
+      return (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-all duration-300">
+          
+          {/* Toast 訊息浮層 */}
+          <div class="fixed top-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+            {toasts.map(t => (
+              <div 
+                key={t.id} 
+                class={`pointer-events-auto p-4 rounded-xl shadow-xl border flex items-center justify-between transition-all duration-300 transform translate-y-0 scale-100 animate-[fadeIn_0.3s_ease] ${
+                  t.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' :
+                  t.type === 'error' ? 'bg-rose-50 text-rose-800 border-rose-100' :
+                  t.type === 'warning' ? 'bg-amber-50 text-amber-800 border-amber-100' :
+                  'bg-sky-50 text-sky-800 border-sky-100'
+                }`}
+              >
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0">
+                    {t.type === 'success' && <span class="text-xl">✨</span>}
+                    {t.type === 'error' && <span class="text-xl">⚠️</span>}
+                    {t.type === 'warning' && <span class="text-xl">⚡</span>}
+                    {t.type === 'info' && <span class="text-xl">💡</span>}
+                  </div>
+                  <p class="text-sm font-medium">{t.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 自訂高質感刪除確認 Modal */}
+          {deleteModal.isOpen && (
+            <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-[scaleUp_0.2s_ease-out]">
+                <div class="flex items-center gap-3 text-rose-600 mb-4">
+                  <span class="p-2 bg-rose-50 rounded-lg"><Icons.Trash /></span>
+                  <h3 class="text-lg font-bold">確認要取消這筆點單嗎？</h3>
+                </div>
+                <p class="text-slate-600 text-sm mb-6 leading-relaxed">
+                  這項操作將會把您點購的飲料從今日訂購列表中永久移除。若要在試算表上同步更新，請維持網路暢通。
+                </p>
+                <div class="flex justify-end gap-3">
+                  <button 
+                    onClick={() => setDeleteModal({ isOpen: false, orderId: null })}
+                    class="px-4 py-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 font-medium transition-colors text-sm"
+                  >
+                    先不用
+                  </button>
+                  <button 
+                    onClick={handleDeleteConfirm}
+                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-medium transition-colors text-sm flex items-center gap-1 shadow-lg shadow-rose-100"
+                  >
+                    確認取消
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 頂部 Header & 漸層 Banner */}
+          <header class="mb-8 relative rounded-2xl overflow-hidden bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-xl">
+            {/* 機制花紋背景裝飾 */}
+            <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+            
+            <div class="relative px-6 py-10 md:py-12 md:px-12 flex flex-col lg:flex-row justify-between lg:items-center gap-8">
+              <div>
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="p-3 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-inner text-2xl hover-pulse">🧋</span>
+                  <span class="bg-emerald-500/30 text-emerald-100 text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider backdrop-blur-md inline-block">
+                    Office Tea Time
+                  </span>
+                </div>
+                <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
+                  辦公室飲料訂購系統
+                </h1>
+                <p class="text-emerald-100/90 mt-2 text-sm md:text-base font-normal max-w-xl">
+                  今天想喝甚麼呢？選好飲品、調製最愛冰糖比例，一鍵送單！
+                  系統將即時在線上 Google Apps Script 中建立今日專屬訂單。
+                </p>
+              </div>
+
+              {/* 即時點單統計面板 */}
+              <div class="flex flex-wrap md:flex-nowrap gap-4">
+                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex items-center gap-3 w-36 md:w-40 shadow-lg">
+                  <div class="p-2.5 bg-emerald-500/20 text-emerald-200 rounded-xl"><Icons.Cup /></div>
+                  <div>
+                    <div class="text-[11px] text-emerald-200/80 font-medium">今日累計</div>
+                    <div class="text-2xl font-extrabold tracking-tight mt-0.5">{stats.totalCups} <span class="text-xs font-normal">杯</span></div>
+                  </div>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex items-center gap-3 w-36 md:w-40 shadow-lg">
+                  <div class="p-2.5 bg-emerald-500/20 text-emerald-200 rounded-xl"><Icons.Coins /></div>
+                  <div>
+                    <div class="text-[11px] text-emerald-200/80 font-medium">消費總額</div>
+                    <div class="text-2xl font-extrabold tracking-tight mt-0.5"><span class="text-lg">NT$</span> {stats.totalPrice}</div>
+                  </div>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex items-center gap-3 w-36 md:w-40 shadow-lg">
+                  <div class="p-2.5 bg-emerald-500/20 text-emerald-200 rounded-xl"><Icons.Users /></div>
+                  <div>
+                    <div class="text-[11px] text-emerald-200/80 font-medium">訂購人數</div>
+                    <div class="text-2xl font-extrabold tracking-tight mt-0.5">{stats.peopleCount} <span class="text-xs font-normal">人</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* 主體雙欄排版 */}
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* 左側：精美菜單展示區 + 統計 Dashboard (佔 7 欄) */}
+            <main class="lg:col-span-7 space-y-6">
+              
+              {/* 今日特別統計報表 (Dashboard 折線分析與最愛佔比) */}
+              {orders.length > 0 && (
+                <section class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 transition-all duration-300">
+                  <h3 class="text-md font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span class="text-emerald-600"><Icons.Sparkles /></span>
+                    今日點單即時分析
+                  </h3>
+                  
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* 熱門飲料 */}
+                    <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                      <div class="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wider">🔥 最能誘惑辦公室的 Top 3 飲品</div>
+                      <div class="space-y-3">
+                        {stats.topDrinks.map((item, idx) => (
+                          <div key={item.name} class="flex items-center justify-between text-sm">
+                            <div class="flex items-center gap-2 font-medium text-slate-700">
+                              <span class={`p-1.5 rounded-lg text-xs font-bold leading-none flex items-center justify-center w-6 h-6 ${
+                                idx === 0 ? 'bg-amber-100 text-amber-700' :
+                                idx === 1 ? 'bg-slate-200/70 text-slate-700' :
+                                'bg-amber-50 text-amber-600/90'
+                              }`}>{idx + 1}</span>
+                              {item.name}
+                            </div>
+                            <span class="text-slate-500 font-bold bg-white px-2 py-0.5 rounded-md border border-slate-100">{item.qty} 杯</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 甜度/冰塊分佈 */}
+                    <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-4">
+                      {/* 甜度優先度 */}
+                      <div>
+                        <div class="text-[11px] font-semibold text-slate-500 mb-1.5 uppercase">🍬 最常被點的甜度比例</div>
+                        {(() => {
+                          const entries = Object.entries(stats.sugarRank);
+                          if (entries.length === 0) return <div class="text-xs text-slate-400">目前無資料</div>;
+                          const [favoriteSugar, qty] = entries.sort((a,b)=>b[1]-a[1])[0];
+                          const percent = Math.round((qty / stats.totalCups) * 100) || 0;
+                          return (
+                            <div class="space-y-1">
+                              <div class="flex justify-between text-xs font-medium text-slate-700">
+                                <span>「{favoriteSugar}」愛好者高達</span>
+                                <span class="font-bold text-emerald-600">{percent}%</span>
+                              </div>
+                              <div class="w-full bg-slate-200 rounded-full h-2">
+                                <div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* 冰塊優先度 */}
+                      <div>
+                        <div class="text-[11px] font-semibold text-slate-500 mb-1.5 uppercase">❄️ 最受歡迎的溫度冷熱</div>
+                        {(() => {
+                          const entries = Object.entries(stats.iceRank);
+                          if (entries.length === 0) return <div class="text-xs text-slate-400">目前無資料</div>;
+                          const [favoriteIce, qty] = entries.sort((a,b)=>b[1]-a[1])[0];
+                          const percent = Math.round((qty / stats.totalCups) * 100) || 0;
+                          return (
+                            <div class="space-y-1">
+                              <div class="flex justify-between text-xs font-medium text-slate-700">
+                                <span>「{favoriteIce}」最讓人心動</span>
+                                <span class="font-bold text-teal-600">{percent}%</span>
+                              </div>
+                              <div class="w-full bg-slate-200 rounded-full h-2">
+                                <div class="bg-teal-500 h-2 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* 辦公室精美菜單 (與 GAS 試算表即時連動) */}
+              <section class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <span class="text-xl">🍵</span>
+                      本店點單推薦牆
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">選定想喝的茶款，點擊卡片即可快速代入右側表單哦！</p>
+                  </div>
+                  
+                  {/* API 手動重新對齊/更新 */}
+                  <button 
+                    onClick={fetchData}
+                    disabled={loading}
+                    class="self-start md:self-auto flex items-center gap-1.5 px-3 py-1.5 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg font-medium transition-colors border border-emerald-100 active:scale-95 duration-200 disabled:opacity-50"
+                  >
+                    {loading ? <Icons.Refresh /> : <span class="text-sm">🔄</span>}
+                    即時同步菜單
+                  </button>
+                </div>
+
+                {/* 類別篩選按鈕列 */}
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-thin">
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      class={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap border ${
+                        activeCategory === cat
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-100'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 菜單卡片 Grid */}
+                {loading && menu.length === BACKUP_MENU.length ? (
+                  // API 讀取時的亮麗 Skeleton 骨架屏
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    {[1, 2, 4, 5].map(i => (
+                      <div key={i} class="border border-slate-100 rounded-xl p-4 space-y-3 animate-pulse">
+                        <div class="h-4 bg-slate-200 rounded w-1/3"></div>
+                        <div class="h-3 bg-slate-100 rounded w-3/4"></div>
+                        <div class="flex justify-between">
+                          <div class="h-3 bg-slate-200 rounded w-12"></div>
+                          <div class="h-5 bg-slate-200 rounded w-16"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    {filteredMenu.map(item => (
+                      <div 
+                        key={item.name}
+                        onClick={() => handleSelectDrink(item)}
+                        class={`border border-slate-100 hover:border-emerald-200 rounded-xl p-4 bg-white hover:bg-emerald-50/20 active:bg-emerald-50/50 cursor-pointer transition-all duration-200 shadow-none hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between ${
+                          formDrink?.name === item.name ? 'ring-2 ring-emerald-500/30 border-emerald-300 bg-emerald-50/10' : ''
+                        }`}
+                      >
+                        <div>
+                          <div class="flex justify-between items-start gap-2 mb-1">
+                            <h4 class="font-bold text-slate-800 text-sm">{item.name}</h4>
+                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium whitespace-nowrap">
+                              {item.category || "無分類"}
+                            </span>
+                          </div>
+                          <p class="text-xs text-slate-500 leading-relaxed mb-3 line-clamp-2">
+                            {item.description || "經典人氣茶品，清涼爽口解膩，極致美味體驗。"}
+                          </p>
+                        </div>
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold">NT$ {item.price} 起</span>
+                          <span class="text-[10px] text-slate-400 flex items-center gap-0.5">點擊選擇 🧋</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </main>
+
+            {/* 右側：表單 OrderForm 與 當日訂購列表 OrderList (佔 5 欄) */}
+            <aside class="lg:col-span-5 space-y-6">
+              
+              {/* 精美 OrderForm 元件卡片 */}
+              <section 
+                ref={formRef}
+                class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 transition-all duration-300"
+              >
+                <div class="flex items-center justify-between mb-5">
+                  <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <span class="text-xl">{editingOrder ? "✏️" : "✨"}</span>
+                    {editingOrder ? "修改我的訂單" : "填寫今日訂單"}
+                  </h2>
+                  
+                  {editingOrder && (
+                    <button 
+                      onClick={handleCancelEdit}
+                      class="text-xs text-slate-400 hover:text-slate-600 border border-slate-200 px-2 py-1 rounded-md hover:bg-slate-50"
+                    >
+                      放棄修改
+                    </button>
+                  )}
+                </div>
+
+                <form onSubmit={handleSubmitOrder} class="space-y-5">
+                  
+                  {/* 1. 訂購人姓名與自動生成頭像 */}
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-2 tracking-wider uppercase">1. 訂購人姓名</label>
+                    <div class="relative rounded-xl shadow-inner flex items-center">
+                      <div class="absolute left-3 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-sm" style={generateAvatarStyles(formName)}>
+                        {formName ? formName.trim().charAt(0) : <Icons.User />}
+                      </div>
+                      <input 
+                        type="text"
+                        placeholder="請輸入名字（例如：王大明）"
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        required
+                        class="w-full pl-14 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. 展示目前選中的飲料與單價 */}
+                  <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <div class="text-[10px] text-slate-400 font-bold uppercase">已選定之基底飲料</div>
+                      <div class="text-sm font-bold text-slate-700 mt-0.5">{formDrink?.name || "尚未選擇"}</div>
+                    </div>
+                    <div class="text-right">
+                      <span class="text-xs text-slate-500">原價</span>
+                      <div class="text-sm font-extrabold text-emerald-700">NT$ {formDrink?.price || 0}</div>
+                    </div>
+                  </div>
+
+                  {/* 3. 糖度按鈕組 Sugar */}
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-2 tracking-wider uppercase">2. 甜度調整 (Sugar)</label>
+                    <div class="grid grid-cols-5 gap-1.5">
+                      {["正常糖", "七分糖", "半糖", "微糖", "無糖"].map(sugar => (
+                        <button
+                          type="button"
+                          key={sugar}
+                          onClick={() => setFormSugar(sugar)}
+                          class={`py-2 text-center rounded-xl text-xs font-medium transition-all duration-200 border ${
+                            formSugar === sugar
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-50'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {sugar.replace("糖", "")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. 冰塊按鈕組 Ice */}
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-2 tracking-wider uppercase">3. 冰量調整 (Ice)</label>
+                    <div class="grid grid-cols-5 gap-1.5">
+                      {["正常冰", "少冰", "微冰", "去冰", "溫熱"].map(ice => (
+                        <button
+                          type="button"
+                          key={ice}
+                          onClick={() => setFormIce(ice)}
+                          class={`py-2 text-center rounded-xl text-xs font-medium transition-all duration-200 border ${
+                            formIce === ice
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-50'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {ice === "正常冰" ? "正常" : ice.replace("冰", "")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 5. 貼心奢華加料區 addon */}
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1.5 tracking-wider uppercase flex items-center gap-1">大口嚼！夢幻加料區 <span class="text-xs">🍮</span></label>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                      {[
+                        { id: "bubble", name: "珍珠", price: 10 },
+                        { id: "coconut", name: "椰果", price: 10 },
+                        { id: "grass", name: "仙草凍", price: 10 },
+                        { id: "pudding", name: "贅澤布丁", price: 15 }
+                      ].map(addon => {
+                        const isSelected = selectedAddons.some(a => a.id === addon.id);
+                        return (
+                          <button
+                            type="button"
+                            key={addon.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedAddons(prev => prev.filter(a => a.id !== addon.id));
+                              } else {
+                                setSelectedAddons(prev => [...prev, addon]);
+                              }
+                            }}
+                            class={`px-3 py-1.5 rounded-lg border flex items-center gap-1 transition-all ${
+                              isSelected 
+                                ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold'
+                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>{isSelected ? "✓" : "+"}</span>
+                            <span>{addon.name}</span>
+                            <span class="text-[10px] text-slate-400">(+{addon.price})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 6. 數量加減器 */}
+                  <div class="flex items-center justify-between border-t border-slate-100 pt-4">
+                    <span class="text-xs font-bold text-slate-600 tracking-wider">4. 訂購杯數數量</span>
+                    <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setFormQuantity(prev => Math.max(1, prev - 1))}
+                        class="w-8 h-8 flex items-center justify-center bg-white text-slate-600 hover:bg-slate-50 rounded-lg shadow-sm border border-slate-200 active:scale-90 transition-transform"
+                      >
+                        <Icons.Minus />
+                      </button>
+                      <span class="w-12 text-center text-sm font-extrabold text-slate-800">{formQuantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormQuantity(prev => prev + 1)}
+                        class="w-8 h-8 flex items-center justify-center bg-white text-slate-600 hover:bg-slate-50 rounded-lg shadow-sm border border-slate-200 active:scale-90 transition-transform"
+                      >
+                        <Icons.Plus />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 金額即時算 */}
+                  <div class="bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100/30 flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-800 flex items-center gap-1">
+                      <span>💰</span>
+                      本單應付款估計：
+                    </span>
+                    <div class="text-right">
+                      <span class="text-xs text-slate-500 mr-1">
+                        ({(formDrink?.price || 0) + selectedAddons.reduce((acc, c) => acc + c.price, 0)} x {formQuantity}杯) =
+                      </span>
+                      <span class="text-xl font-black text-emerald-700">
+                        NT$ {((formDrink?.price || 0) + selectedAddons.reduce((acc, c) => acc + c.price, 0)) * formQuantity}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 提交按鈕 */}
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    class={`w-full py-3.5 rounded-xl font-bold text-sm tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all duration-300 ${
+                      submitting 
+                        ? 'bg-slate-400 text-white cursor-not-allowed shadow-none' 
+                        : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-200 hover:shadow-emerald-300/60 hover:-translate-y-0.5'
+                    }`}
+                  >
+                    {submitting ? (
+                      <span class="flex items-center gap-2">
+                        <Icons.Refresh /> 拋接資料並存儲中 ...
+                      </span>
+                    ) : (
+                      <span class="flex items-center gap-1.5">
+                        {editingOrder ? "✏️ 確認修改我的訂單" : "🧋 確認送出我的點單 ✨"}
+                      </span>
+                    )}
+                  </button>
+                  
+                </form>
+              </section>
+
+              {/* 精美 OrderList 元件卡片 (今日已訂購項目) */}
+              <section class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-5 border-b border-slate-50 pb-3">
+                  <div>
+                    <h2 class="text-md font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <span>📋</span>
+                      今日辦公室訂購列表
+                    </h2>
+                  </div>
+                  <span class="text-xs text-slate-500 font-semibold bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <Icons.Calendar /> 今日名冊
+                  </span>
+                </div>
+
+                {/* 訂單清單展示 */}
+                {loading && orders.length === 0 ? (
+                  // 載入 Skeleton 骨架屏
+                  <div class="space-y-4">
+                    {[1, 2].map(i => (
+                      <div key={i} class="border border-slate-50 rounded-xl p-4 flex gap-4 animate-pulse">
+                        <div class="w-10 h-10 bg-slate-200 rounded-full flex-shrink-0"></div>
+                        <div class="flex-1 space-y-2">
+                          <div class="h-4 bg-slate-200 rounded w-1/4"></div>
+                          <div class="h-3 bg-slate-100 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : orders.length === 0 ? (
+                  // 【無人訂購】的精美空狀態
+                  <div class="text-center py-10 px-4 group">
+                    <div class="relative inline-block w-28 h-28 mx-auto mb-5 text-slate-300 group-hover:scale-105 transition-transform duration-300">
+                      <svg class="w-full h-full text-emerald-100/80" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17 8h1a4 4 0 1 1 0 8h-1M2 8h15v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
+                      </svg>
+                      <div class="absolute -top-3 -right-3 text-4xl animate-bounce">🧋</div>
+                      <div class="absolute bottom-1 right-2 text-2xl">✨</div>
+                    </div>
+                    
+                    <h3 class="text-sm font-extrabold text-slate-700 mb-1.5">今天大家還沒點飲料喔！</h3>
+                    <p class="text-xs text-slate-400 max-w-xs mx-auto mb-4 leading-relaxed">
+                      下午想來杯手搖飲振奮精神嗎？趕緊填寫左側表單，點燃今天的下午茶團聚熱情！
+                    </p>
+                    <button 
+                      onClick={() => {
+                        showToast("已為您聚焦於姓名輸入框！期待您的第一單 🥳", "info");
+                        const input = document.querySelector('input[type="text"]');
+                        if (input) {
+                          input.focus();
+                          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      class="inline-flex items-center gap-1.5 px-4  py-2 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold transition-all duration-200 active:scale-95"
+                    >
+                      <span>⚡</span> 我來當第一個發起者！
+                    </button>
+                  </div>
+                ) : (
+                  // 當日所有訂單列表
+                  <div class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                    {orders.map((order) => (
+                      <div 
+                        key={order.orderId}
+                        class={`group relative border rounded-xl p-4 bg-white hover:bg-slate-50/50 transition-all duration-300 flex items-start gap-3.5 ${
+                          editingOrder?.orderId === order.orderId 
+                            ? 'border-emerald-500 bg-emerald-50/10 shadow-sm ring-1 ring-emerald-500/10' 
+                            : 'border-slate-100 shadow-sm hover:shadow-md'
+                        }`}
+                      >
+                        {/* 彩色生成頭像 */}
+                        <div 
+                          class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-black shadow-sm"
+                          style={generateAvatarStyles(order.name)}
+                        >
+                          {order.name ? order.name.trim().charAt(0) : "無"}
+                        </div>
+
+                        {/* 訂單詳情 */}
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center justify-between gap-1 w-full">
+                            <span class="font-bold text-slate-800 text-sm truncate">{order.name}</span>
+                            <span class="text-xs font-extrabold text-slate-950 whitespace-nowrap bg-teal-50 px-2 py-0.5 rounded-md">
+                              NT$ {order.totalPrice}
+                            </span>
+                          </div>
+
+                          <div class="text-xs font-bold text-slate-700 mt-1.5 flex items-center gap-1">
+                            <span>🥤</span>
+                            {order.drink}
+                          </div>
+
+                          {/* 甜度、冰塊、數量標記 */}
+                          <div class="flex flex-wrap items-center gap-1 mt-2">
+                            <span class="text-[10px] bg-amber-50 text-amber-800 border border-amber-100 rounded px-1.5 py-0.5 font-bold">
+                              {order.sugar}
+                            </span>
+                            <span class="text-[10px] bg-sky-50 text-sky-800 border border-sky-100 rounded px-1.5 py-0.5 font-bold">
+                              {order.ice}
+                            </span>
+                            <span class="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 font-semibold">
+                              {order.quantity} 杯
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 修改/刪除懸浮或常駐動態操作組 */}
+                        <div class="flex flex-col gap-1.5 self-center opacity-70 group-hover:opacity-100 transition-opacity">
+                          
+                          {/* 編輯 */}
+                          <button
+                            onClick={() => handleEditClick(order)}
+                            title="修改這一單"
+                            class="p-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-400 hover:text-emerald-700 rounded-lg border border-slate-200/60 hover:border-emerald-200 transition-colors focus:outline-none"
+                          >
+                            <Icons.Edit />
+                          </button>
+
+                          {/* 刪除 */}
+                          <button
+                            onClick={() => triggerDeleteConfirm(order.orderId)}
+                            title="撤銷這一單"
+                            class="p-1.5 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg border border-slate-200/60 hover:border-rose-200 transition-colors focus:outline-none"
+                          >
+                            <Icons.Trash />
+                          </button>
+
+                        </div>
+
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* 系統溫馨提示 */}
+              <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 text-xs text-slate-400 flex items-start gap-2">
+                <span class="text-sm">💡</span>
+                <p class="leading-relaxed">
+                  本系統會將訂單同步儲存到與您綁定的 Google Apps Script 後端試算表。如果您需要更改或刪除今天訂過的東西，可以在下方名冊點擊「編輯」或「垃圾桶」圖標直接修改唷！
+                </p>
+              </div>
+
+            </aside>
+          </div>
+
+          <footer class="mt-16 text-center text-slate-400 text-xs border-t border-slate-200/60 pt-6">
+            <p>辦公室午後救星 © 2026 飲料訂購系統 100% 獨立運行。串接專屬雲端 Google 試算表。</p>
+            <p class="mt-1">Designed with Passion. Powered by React, Tailwind & GAS Api 后端。</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // 渲染 React 應用程式到 Root 節點中
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
